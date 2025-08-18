@@ -1,1 +1,6 @@
-streamlit
+pycaret[time_series]==3.3.2
+prophet==1.1.7
+scikit-learn==1.4.2
+sktime==0.26.0
+dask[dataframe]<2025.1
+dask-expr<2025.1
