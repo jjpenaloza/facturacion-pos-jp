@@ -2,7 +2,7 @@ import streamlit as st
 import joblib  # mejor que pickle para sklearn
 from pathlib import Path
 from pycaret.time_series import *
-import pycaret.containers.models.time_series
+#import pycaret.containers.models.time_series
 from pycaret.time_series import load_model, predict_model
 
 import streamlit as st
