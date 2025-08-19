@@ -103,31 +103,89 @@ def get_controls():
     
     return entidad_seleccionada.lower(), horizonte
 
+import streamlit as st
+
 def show_data_inputs(entidad: str, horizonte: int):
-    # Mensaje actualizado para ser más general
+    # Mensaje general
     st.write(f"Valores de las variables exógenas para {entidad.capitalize()} para los próximos {horizonte} meses:")
 
+    # --- init seguro de session_state.input_data ---
+    st.session_state.setdefault("input_data", {})
     for i in range(horizonte):
-        month_data = st.session_state.input_data.get(i, {})
-        fecha = month_data.get('fecha', f"Fecha {i+1}")
-        
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.write(f"**{fecha}**")
-        with col2:
-            st.session_state.input_data[i]['nro_puntos_ventas'] = st.text_input(
-                "Puntos de Venta:",
-                key=f"puntos_ventas_{i}_{entidad}",
-                value=str(month_data.get('nro_puntos_ventas', ''))
-            )
-        with col3:
-            st.session_state.input_data[i]['oferta_monetaria_m1'] = st.text_input(
-                "Oferta Monetaria M1:",
-                key=f"oferta_m1_{i}_{entidad}",
-                value=str(month_data.get('oferta_monetaria_m1', ''))
-            )
-        st.markdown("---")
+        st.session_state.input_data.setdefault(i, {})
+        st.session_state.input_data[i].setdefault("fecha", f"Fecha {i+1}")
+        st.session_state.input_data[i].setdefault("nro_puntos_ventas", "")
+        st.session_state.input_data[i].setdefault("oferta_monetaria_m1", "")
 
+    # --- Encabezados (una sola vez) ---
+    h1, h2, h3 = st.columns([3, 4, 4])
+    with h1: st.markdown("**Fecha**")
+    with h2: st.markdown("**Puntos de Venta**")
+    with h3: st.markdown("**Oferta Monetaria M1**")
+    st.divider()
+
+    # --- Form para evitar re-runs por cada input ---
+    with st.form(f"form_parametros_{entidad}"):
+        for i in range(horizonte):
+            month_data = st.session_state.input_data.get(i, {})
+            fecha = month_data.get("fecha", f"Fecha {i+1}")
+
+            col1, col2, col3 = st.columns([3, 4, 4])
+
+            # Columna 1: fecha como "subtítulo/label" (si la quisieras editable, cámbiala por st.text_input)
+            with col1:
+                st.caption(fecha)
+
+            # Columna 2: número de puntos de venta
+            with col2:
+                val_pv = month_data.get("nro_puntos_ventas", "")
+                try:
+                    def_pv = int(val_pv) if val_pv not in ("", None) and str(val_pv).strip() != "" else 0
+                except Exception:
+                    def_pv = 0
+
+                st.number_input(
+                    label="Puntos de Venta",
+                    key=f"puntos_ventas_{i}_{entidad}",
+                    value=def_pv,
+                    step=1,
+                    format="%d",
+                    label_visibility="collapsed",
+                )
+
+            # Columna 3: oferta monetaria M1
+            with col3:
+                val_m1 = month_data.get("oferta_monetaria_m1", "")
+                try:
+                    def_m1 = int(val_m1) if val_m1 not in ("", None) and str(val_m1).strip() != "" else 0
+                except Exception:
+                    def_m1 = 0
+
+                st.number_input(
+                    label="Oferta Monetaria M1",
+                    key=f"oferta_m1_{i}_{entidad}",
+                    value=def_m1,
+                    step=1,
+                    format="%d",
+                    label_visibility="collapsed",
+                )
+
+            # Separador fino entre filas
+            st.markdown("<div style='height:0.25rem;'></div>", unsafe_allow_html=True)
+
+        submitted = st.form_submit_button("Guardar cambios", use_container_width=True)
+
+    # --- Al enviar, volcamos al session_state UNA sola vez ---
+    if submitted:
+        for i in range(horizonte):
+            pv = st.session_state.get(f"puntos_ventas_{i}_{entidad}", 0)
+            m1 = st.session_state.get(f"oferta_m1_{i}_{entidad}", 0)
+
+            # Si tu lógica downstream espera strings, los dejamos como str
+            st.session_state.input_data[i]["nro_puntos_ventas"] = str(pv) if pv is not None else ""
+            st.session_state.input_data[i]["oferta_monetaria_m1"] = str(m1) if m1 is not None else ""
+
+        st.success("Parámetros guardados.")
 
 def create_chart_data(entidad: str, horizonte: int):
     # 1. Preparar los datos exógenos futuros para la predicción
@@ -196,22 +254,22 @@ def create_chart_data(entidad: str, horizonte: int):
     try:
         if not isinstance(X_for_prediction.index, pd.PeriodIndex):
             X_for_prediction.index = X_for_prediction.index.to_period('M') # O 'MS' si es inicio de mes
-        st.write(f"Índice de X_for_prediction después de conversión: {X_for_prediction.index.dtype}")
+        #st.write(f"Índice de X_for_prediction después de conversión: {X_for_prediction.index.dtype}")
     except Exception as e:
         st.error(f"Error al convertir el índice de X_for_prediction a PeriodIndex: {e}")
         return pd.DataFrame()
 
 
     # Diagnóstico sktime: Comprobar el formato de X_for_prediction
-    st.write("DataFrame 'X' enviado al modelo para predicción:")
-    st.dataframe(X_for_prediction)
-    st.write(f"Información del índice de X_for_prediction: {X_for_prediction.index.dtype}")
-    st.write(f"Primeros 5 registros de X_for_prediction:\n{X_for_prediction.head()}")
-    st.write(f"Conteo de valores NaN por columna en X_for_prediction:\n{X_for_prediction.isnull().sum()}")
+    #st.write("DataFrame 'X' enviado al modelo para predicción:")
+    #st.dataframe(X_for_prediction)
+    #st.write(f"Información del índice de X_for_prediction: {X_for_prediction.index.dtype}")
+    #st.write(f"Primeros 5 registros de X_for_prediction:\n{X_for_prediction.head()}")
+    #st.write(f"Conteo de valores NaN por columna en X_for_prediction:\n{X_for_prediction.isnull().sum()}")
 
     try:
         check_raise(X_for_prediction, "pd.DataFrame", scitype="Series")
-        st.success("Formato de 'X_for_prediction' verificado por sktime como compatible 'pd.DataFrame' (scitype Series).")
+        #st.success("Formato de 'X_for_prediction' verificado por sktime como compatible 'pd.DataFrame' (scitype Series).")
     except Exception as e:
         st.error(f"Diagnóstico sktime para 'X_for_prediction' falló. Por favor, revisa los detalles de 'X' arriba. Error: {e}")
         return pd.DataFrame()
@@ -280,9 +338,9 @@ def create_chart(entidad: str):
 # --- Layout Principal de la Aplicación ---
 def main():
     st.title("Panel de Predicción de Entidades")
-    col1, col2 = st.columns()
+    # col1, col2 = st.columns([12, 24])
     
-    with col1:
+    with st.container():
         entidad_display, horizonte = get_controls()
         
         if (entidad_display != st.session_state.entidad_seleccionada_anterior or
@@ -330,8 +388,10 @@ def main():
             st.success("Generando predicción...")
             st.session_state.chart_data = create_chart_data(entidad_display, horizonte)
             st.session_state.entidad_graficada = entidad_display
-            
-    with col2:
+    
+    st.divider()            
+
+    with st.container():
         create_chart(st.session_state.entidad_graficada)
 
 if __name__ == "__main__":
