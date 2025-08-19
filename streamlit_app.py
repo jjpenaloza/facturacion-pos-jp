@@ -280,7 +280,7 @@ def create_chart(entidad: str):
 # --- Layout Principal de la Aplicación ---
 def main():
     st.title("Panel de Predicción de Entidades")
-    col1, col2 = st.columns([4, 5])
+    col1, col2 = st.columns()
     
     with col1:
         entidad_display, horizonte = get_controls()
